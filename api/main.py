@@ -60,7 +60,12 @@ def _load_data() -> None:
     global _sims, _families, _sims_by_id, _family_by_number
 
     userdata = _resolve_userdata_path()
-    _sims, _families = parse_neighborhood(str(userdata))
+    sims, families = parse_neighborhood(str(userdata))
+
+    # Filter out the "Default" family (chunk_id 0) — contains NPCs like
+    # maid, thief, repairman, npc_* that aren't meaningful conversation partners.
+    _families = [f for f in families if f.chunk_id != 0]
+    _sims = [s for s in sims if s.family_number != 0]
     _sims_by_id = {s.id: s for s in _sims}
     _family_by_number = {f.chunk_id: f for f in _families}
 
