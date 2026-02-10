@@ -338,6 +338,69 @@ def _parse_fams(data: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Character file scanner (display names from CTSS chunks)
+# ---------------------------------------------------------------------------
+
+def _scan_character_names(userdata_path: Path) -> dict[int, str]:
+    """
+    Scan all character IFF files in UserData/Characters/ and build a
+    GUID -> display name mapping.
+
+    Each character file has an OBJD chunk (GUID at byte offset 28 in chunk
+    data: 4B version + 12 uint16 fields, then uint32 GUID) and a CTSS
+    chunk (STR format -3, first string is the display name).
+    """
+    chars_dir = userdata_path / "Characters"
+    if not chars_dir.is_dir():
+        return {}
+
+    guid_to_name: dict[int, str] = {}
+
+    for filepath in sorted(chars_dir.iterdir()):
+        if filepath.suffix.lower() != ".iff":
+            continue
+
+        data = filepath.read_bytes()
+        if len(data) < 64:
+            continue
+
+        name: str | None = None
+        guid: int | None = None
+
+        pos = 64  # skip IFF header
+        while pos + 76 <= len(data):
+            chunk_type = data[pos : pos + 4].decode("ascii", errors="replace")
+            chunk_size = struct.unpack_from(">I", data, pos + 4)[0]
+            if chunk_size < 76:
+                break
+            chunk_data = data[pos + 76 : pos + chunk_size]
+
+            if chunk_type == "CTSS" and name is None and len(chunk_data) >= 6:
+                fmt = struct.unpack_from("<h", chunk_data, 0)[0]
+                if fmt == -3:
+                    count = struct.unpack_from("<H", chunk_data, 2)[0]
+                    if count > 0:
+                        off = 5  # format(2) + count(2) + lang(1)
+                        start = off
+                        while off < len(chunk_data) and chunk_data[off] != 0:
+                            off += 1
+                        name = chunk_data[start:off].decode(
+                            "ascii", errors="replace"
+                        )
+
+            if chunk_type == "OBJD" and guid is None and len(chunk_data) >= 32:
+                # 4B version + 12 uint16 fields = 28 bytes, then uint32 GUID
+                guid = struct.unpack_from("<I", chunk_data, 28)[0]
+
+            pos += chunk_size
+
+        if guid is not None and name:
+            guid_to_name[guid] = name
+
+    return guid_to_name
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -386,5 +449,12 @@ def parse_neighborhood(userdata_path: str) -> tuple[list[Sim], list[Family]]:
         family = guid_to_family.get(sim.guid)
         if family:
             sim.family_number = family.chunk_id
+
+    # Resolve display names from character IFF files
+    guid_to_name = _scan_character_names(Path(userdata_path))
+    for sim in sims:
+        display_name = guid_to_name.get(sim.guid)
+        if display_name:
+            sim.name = display_name
 
     return sims, families
