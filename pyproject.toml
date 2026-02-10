@@ -5,6 +5,6 @@ description = "Sims 1 compatibility checker - find the best conversation partner
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115",
+    "fastapi[standard]>=0.115",
     "uvicorn>=0.34",
 ]
