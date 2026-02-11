@@ -9,6 +9,7 @@
   let showKnownOnly = $state(false);
   let sidebarFilter = $state('');
   let rankingsFilter = $state('');
+  let mobileView = $state('list'); // 'list' or 'rankings'
 
   // Group sims by family name, filtered by sidebar search
   let groupedSims = $derived.by(() => {
@@ -73,6 +74,7 @@
     selectedSimId = simId;
     rankings = [];
     rankingsFilter = '';
+    mobileView = 'rankings';
     loadingRankings = true;
     try {
       const res = await fetch(`/api/sims/${simId}/compatibility`);
@@ -84,6 +86,10 @@
     } finally {
       loadingRankings = false;
     }
+  }
+
+  function goBack() {
+    mobileView = 'list';
   }
 
   function formatInterest(key) {
@@ -109,13 +115,9 @@
 </script>
 
 <div class="layout">
-  <header class="header">
-    <h1>Sims 1 Compatibility Checker</h1>
-  </header>
-
   <div class="content">
     <!-- Left panel: Sim selector -->
-    <aside class="sidebar">
+    <aside class="sidebar" class:mobile-hidden={mobileView === 'rankings'}>
       <h2 class="panel-title">Sims</h2>
       <div class="filter-input-wrap">
         <input
@@ -162,12 +164,13 @@
     </aside>
 
     <!-- Right panel: Compatibility rankings -->
-    <main class="main-panel">
+    <main class="main-panel" class:mobile-hidden={mobileView === 'list'}>
       {#if !selectedSim}
         <div class="empty-state">
           <p>Select a sim from the list to see compatibility rankings.</p>
         </div>
       {:else}
+        <button class="back-button" onclick={goBack}>&larr; All sims</button>
         <div class="selected-sim-header">
           <img
             class="selected-sim-portrait"
@@ -226,8 +229,10 @@
                     alt=""
                     onerror={(e) => e.target.style.display = 'none'}
                   />
-                  <span class="ranking-sim-name">{ranking.sim.name}</span>
-                  <span class="ranking-family-name">{ranking.sim.family_name}</span>
+                  <div class="ranking-sim-identity">
+                    <span class="ranking-sim-name">{ranking.sim.name}</span>
+                    <span class="ranking-family-name">{ranking.sim.family_name}</span>
+                  </div>
                   <span class="ranking-score-value">{ranking.score}</span>
                 </div>
 
@@ -296,18 +301,6 @@
     height: 100vh;
   }
 
-  .header {
-    border-bottom: 1px solid var(--color-border);
-    padding: 10px 24px;
-    flex-shrink: 0;
-  }
-
-  .header h1 {
-    font-size: 1rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
   .content {
     display: flex;
     flex: 1;
@@ -330,7 +323,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--color-muted);
-    padding: 12px 16px 8px;
+    padding: 24px 16px 8px;
     flex-shrink: 0;
   }
 
@@ -603,14 +596,25 @@
     flex-shrink: 0;
   }
 
+  .ranking-sim-identity {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+  }
+
   .ranking-sim-name {
     font-weight: 600;
     font-size: 0.95rem;
+    white-space: nowrap;
   }
 
   .ranking-family-name {
     font-size: 0.8rem;
     color: var(--color-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .ranking-score-value {
@@ -709,7 +713,11 @@
     gap: 4px 6px;
   }
 
-  /* Responsive: stack on narrow screens */
+  .back-button {
+    display: none;
+  }
+
+  /* Mobile: separate screens */
   @media (max-width: 700px) {
     .content {
       flex-direction: column;
@@ -717,9 +725,55 @@
 
     .sidebar {
       width: 100%;
-      max-height: 40vh;
+      flex: 1;
       border-right: none;
-      border-bottom: 1px solid var(--color-border);
+    }
+
+    .main-panel {
+      width: 100%;
+      flex: 1;
+      padding: 16px;
+    }
+
+    .mobile-hidden {
+      display: none;
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: var(--color-accent);
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 0 0 12px;
+    }
+
+    .rankings-toolbar {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .rankings-toolbar-right {
+      width: 100%;
+    }
+
+    .filter-input-wrap--inline {
+      flex: 1;
+    }
+
+    .ranking-sim-identity {
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .interest-label {
+      min-width: 0;
     }
   }
 </style>
