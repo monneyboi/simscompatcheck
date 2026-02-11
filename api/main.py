@@ -16,8 +16,10 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi.responses import Response
+
 from .compatibility import rank_compatibility
-from .iff_parser import Family, Sim, parse_neighborhood
+from .iff_parser import CharacterInfo, Family, Sim, parse_neighborhood
 
 # ---------------------------------------------------------------------------
 # Resolve the UserData path
@@ -54,13 +56,21 @@ _sims: list[Sim] = []
 _families: list[Family] = []
 _sims_by_id: dict[int, Sim] = {}
 _family_by_number: dict[int, Family] = {}
+_portraits: dict[int, bytes] = {}  # guid -> BMP bytes
 
 
 def _load_data() -> None:
-    global _sims, _families, _sims_by_id, _family_by_number
+    global _sims, _families, _sims_by_id, _family_by_number, _portraits
 
     userdata = _resolve_userdata_path()
-    sims, families = parse_neighborhood(str(userdata))
+    sims, families, guid_to_info = parse_neighborhood(str(userdata))
+
+    # Build portrait lookup: sim neighbour_id -> BMP bytes
+    _portraits = {}
+    for s in sims:
+        info = guid_to_info.get(s.guid)
+        if info and info.portrait:
+            _portraits[s.id] = info.portrait
 
     # Filter out the "Default" family (chunk_id 0) — contains NPCs like
     # maid, thief, repairman, npc_* that aren't meaningful conversation partners.
@@ -182,6 +192,15 @@ async def get_compatibility(sim_id: int):
             for r in rankings
         ],
     }
+
+
+@app.get("/api/sims/{sim_id}/portrait")
+async def get_portrait(sim_id: int):
+    """Return the sim's portrait as a BMP image."""
+    bmp = _portraits.get(sim_id)
+    if bmp is None:
+        raise HTTPException(status_code=404, detail="No portrait available")
+    return Response(content=bmp, media_type="image/bmp")
 
 
 @app.get("/api/families")

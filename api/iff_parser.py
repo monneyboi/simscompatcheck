@@ -356,20 +356,27 @@ def _parse_fams(data: bytes) -> str:
 # Character file scanner (display names from CTSS chunks)
 # ---------------------------------------------------------------------------
 
-def _scan_character_names(userdata_path: Path) -> dict[int, str]:
+@dataclass
+class CharacterInfo:
+    name: str
+    portrait: bytes | None = None  # raw BMP data
+
+
+def _scan_characters(userdata_path: Path) -> dict[int, CharacterInfo]:
     """
     Scan all character IFF files in UserData/Characters/ and build a
-    GUID -> display name mapping.
+    GUID -> CharacterInfo mapping (display name + portrait BMP).
 
-    Each character file has an OBJD chunk (GUID at byte offset 28 in chunk
-    data: 4B version + 12 uint16 fields, then uint32 GUID) and a CTSS
-    chunk (STR format -3, first string is the display name).
+    Each character file has:
+    - OBJD chunk: GUID at byte offset 28 (4B version + 12 uint16 fields)
+    - CTSS chunk: STR format -3, first string is the display name
+    - BMP_ chunk ID 2007 label 'web_image': 45x45 portrait as raw BMP
     """
     chars_dir = userdata_path / "Characters"
     if not chars_dir.is_dir():
         return {}
 
-    guid_to_name: dict[int, str] = {}
+    guid_to_info: dict[int, CharacterInfo] = {}
 
     for filepath in sorted(chars_dir.iterdir()):
         if filepath.suffix.lower() != ".iff":
@@ -381,11 +388,13 @@ def _scan_character_names(userdata_path: Path) -> dict[int, str]:
 
         name: str | None = None
         guid: int | None = None
+        portrait: bytes | None = None
 
         pos = 64  # skip IFF header
         while pos + 76 <= len(data):
             chunk_type = data[pos : pos + 4].decode("ascii", errors="replace")
             chunk_size = struct.unpack_from(">I", data, pos + 4)[0]
+            chunk_id = struct.unpack_from(">H", data, pos + 8)[0]
             if chunk_size < 76:
                 break
             chunk_data = data[pos + 76 : pos + chunk_size]
@@ -404,27 +413,38 @@ def _scan_character_names(userdata_path: Path) -> dict[int, str]:
                         )
 
             if chunk_type == "OBJD" and guid is None and len(chunk_data) >= 32:
-                # 4B version + 12 uint16 fields = 28 bytes, then uint32 GUID
                 guid = struct.unpack_from("<I", chunk_data, 28)[0]
+
+            if (
+                chunk_type == "BMP_"
+                and chunk_id == 2007
+                and portrait is None
+                and len(chunk_data) >= 2
+                and chunk_data[:2] == b"BM"
+            ):
+                portrait = bytes(chunk_data)
 
             pos += chunk_size
 
         if guid is not None and name:
-            guid_to_name[guid] = name
+            guid_to_info[guid] = CharacterInfo(name=name, portrait=portrait)
 
-    return guid_to_name
+    return guid_to_info
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-def parse_neighborhood(userdata_path: str) -> tuple[list[Sim], list[Family]]:
+def parse_neighborhood(
+    userdata_path: str,
+) -> tuple[list[Sim], list[Family], dict[int, CharacterInfo]]:
     """
     Parse `Neighborhood.iff` from the given UserData directory path.
 
-    Returns (sims, families) where each sim has person data populated and
-    each family has its name resolved from the corresponding FAMs chunk.
+    Returns (sims, families, guid_to_info) where each sim has person data
+    populated, each family has its name resolved, and guid_to_info maps
+    sim GUIDs to their character info (name + portrait BMP bytes).
     """
     iff_path = Path(userdata_path) / "Neighborhood.iff"
     data = iff_path.read_bytes()
@@ -465,11 +485,11 @@ def parse_neighborhood(userdata_path: str) -> tuple[list[Sim], list[Family]]:
         if family:
             sim.family_number = family.chunk_id
 
-    # Resolve display names from character IFF files
-    guid_to_name = _scan_character_names(Path(userdata_path))
+    # Resolve display names and portraits from character IFF files
+    guid_to_info = _scan_characters(Path(userdata_path))
     for sim in sims:
-        display_name = guid_to_name.get(sim.guid)
-        if display_name:
-            sim.name = display_name
+        info = guid_to_info.get(sim.guid)
+        if info:
+            sim.name = info.name
 
-    return sims, families
+    return sims, families, guid_to_info

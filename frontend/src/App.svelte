@@ -116,6 +116,12 @@
                   class:selected={selectedSimId === sim.id}
                   onclick={() => selectSim(sim.id)}
                 >
+                  <img
+                    class="sim-portrait-small"
+                    src="/api/sims/{sim.id}/portrait"
+                    alt=""
+                    onerror={(e) => e.target.style.display = 'none'}
+                  />
                   <span class="sim-name-label">{sim.name}</span>
                   <span class="sim-meta">{sim.age} / {sim.gender}</span>
                 </button>
@@ -134,13 +140,21 @@
         </div>
       {:else}
         <div class="selected-sim-header">
-          <h2>
-            {selectedSim.name}
-            <span class="selected-family">({selectedSim.family_name})</span>
-          </h2>
-          <div class="selected-sim-details">
-            <span class="detail-chip">{selectedSim.age}</span>
-            <span class="detail-chip">{selectedSim.gender}</span>
+          <img
+            class="selected-sim-portrait"
+            src="/api/sims/{selectedSim.id}/portrait"
+            alt=""
+            onerror={(e) => e.target.style.display = 'none'}
+          />
+          <div class="selected-sim-info">
+            <h2>
+              {selectedSim.name}
+              <span class="selected-family">{selectedSim.family_name}</span>
+            </h2>
+            <div class="selected-sim-details">
+              <span class="detail-chip">{selectedSim.age}</span>
+              <span class="detail-chip">{selectedSim.gender}</span>
+            </div>
           </div>
         </div>
 
@@ -161,6 +175,12 @@
               <div class="ranking-card">
                 <div class="ranking-header">
                   <span class="ranking-rank">#{i + 1}</span>
+                  <img
+                    class="sim-portrait"
+                    src="/api/sims/{ranking.sim.id}/portrait"
+                    alt=""
+                    onerror={(e) => e.target.style.display = 'none'}
+                  />
                   <span class="ranking-sim-name">{ranking.sim.name}</span>
                   <span class="ranking-family-name">{ranking.sim.family_name}</span>
                   <span class="ranking-score-value">{ranking.score}</span>
@@ -229,12 +249,12 @@
 
   .header {
     border-bottom: 1px solid var(--color-border);
-    padding: 12px 24px;
+    padding: 10px 24px;
     flex-shrink: 0;
   }
 
   .header h1 {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
     letter-spacing: -0.01em;
   }
@@ -272,27 +292,29 @@
   }
 
   .family-group {
-    margin-bottom: 4px;
+    margin-bottom: 0;
   }
 
   .family-name {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--color-muted);
-    padding: 10px 16px 4px;
+    padding: 8px 16px 4px;
     background: #f8f8f8;
     border-bottom: 1px solid var(--color-border);
-    border-top: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
 
   .sim-button {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
     width: 100%;
-    padding: 8px 16px;
+    padding: 6px 16px;
     background: none;
     border: none;
     border-bottom: 1px solid #eee;
@@ -317,14 +339,28 @@
     color: rgba(255, 255, 255, 0.75);
   }
 
+  .sim-portrait-small {
+    width: 24px;
+    height: 24px;
+    border-radius: 2px;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+  }
+
   .sim-name-label {
     font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .sim-meta {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--color-muted);
     font-family: var(--font-mono);
+    flex-shrink: 0;
   }
 
   /* Right panel */
@@ -354,31 +390,44 @@
   }
 
   .selected-sim-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
     margin-bottom: 20px;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--color-border);
   }
 
-  .selected-sim-header h2 {
-    font-size: 1.25rem;
+  .selected-sim-portrait {
+    width: 48px;
+    height: 48px;
+    border-radius: 3px;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+  }
+
+  .selected-sim-info h2 {
+    font-size: 1.2rem;
     font-weight: 600;
+    line-height: 1.3;
   }
 
   .selected-family {
     font-weight: 400;
     color: var(--color-muted);
+    font-size: 0.9rem;
   }
 
   .selected-sim-details {
     display: flex;
-    gap: 8px;
-    margin-top: 6px;
+    gap: 6px;
+    margin-top: 4px;
   }
 
   .detail-chip {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    padding: 2px 8px;
+    font-size: 0.7rem;
+    padding: 1px 6px;
     background: #f3f3f3;
     border: 1px solid var(--color-border);
     border-radius: 3px;
@@ -417,7 +466,7 @@
   .rankings-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .ranking-card {
@@ -428,16 +477,26 @@
 
   .ranking-header {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 8px;
   }
 
   .ranking-rank {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--color-muted);
-    min-width: 28px;
+    min-width: 24px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .sim-portrait {
+    width: 36px;
+    height: 36px;
+    border-radius: 2px;
+    image-rendering: pixelated;
+    flex-shrink: 0;
   }
 
   .ranking-sim-name {
@@ -446,7 +505,7 @@
   }
 
   .ranking-family-name {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--color-muted);
   }
 
@@ -456,48 +515,51 @@
     font-weight: 600;
     font-size: 0.85rem;
     color: var(--color-accent);
+    flex-shrink: 0;
   }
 
   .score-bar-container {
-    height: 6px;
+    height: 4px;
     background: #eee;
-    border-radius: 3px;
-    margin-bottom: 10px;
+    border-radius: 2px;
+    margin-bottom: 8px;
     overflow: hidden;
   }
 
   .score-bar {
     height: 100%;
     background: var(--color-accent);
-    border-radius: 3px;
+    border-radius: 2px;
     transition: width 0.3s ease;
   }
 
   .ranking-details {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
   }
 
   .interest-row, .personality-row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px 6px;
   }
 
   .interest-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--color-muted);
-    min-width: 54px;
+    min-width: 72px;
+    flex-shrink: 0;
   }
 
   .tag {
     font-family: var(--font-mono);
-    font-size: 0.7rem;
-    padding: 1px 7px;
+    font-size: 0.65rem;
+    padding: 1px 6px;
     border-radius: 3px;
     font-weight: 500;
+    white-space: nowrap;
   }
 
   .tag-green {
@@ -514,7 +576,7 @@
 
   .data-value {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
   }
 
   .rel-positive {
@@ -526,7 +588,7 @@
   }
 
   .rel-detail {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--color-muted);
   }
 
@@ -534,7 +596,7 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px 6px;
   }
 
   /* Responsive: stack on narrow screens */
