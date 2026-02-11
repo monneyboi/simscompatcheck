@@ -2,7 +2,7 @@
 
 Figure out which sims should talk to whom, based on shared interests.
 
-Drop your `UserData/` folder (and optionally `GameData/`) from The Sims 1 (Complete Collection / Legacy) into the project root and start the servers.
+Drop your `UserData/` folder from The Sims 1 (Complete Collection / Legacy) into the project root and start the servers.
 
 ## Setup
 
