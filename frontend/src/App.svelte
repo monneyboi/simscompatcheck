@@ -1,7 +1,6 @@
 <script>
   let sims = $state([]);
   let families = $state([]);
-  let selectedSimId = $state(null);
   let rankings = $state([]);
   let loading = $state(true);
   let loadingRankings = $state(false);
@@ -9,7 +8,18 @@
   let showKnownOnly = $state(false);
   let sidebarFilter = $state('');
   let rankingsFilter = $state('');
-  let mobileView = $state('list'); // 'list' or 'rankings'
+
+  // --- Routing ---
+  let currentPath = $state(window.location.pathname);
+  let routeSimId = $derived.by(() => {
+    const match = currentPath.match(/^\/sim\/(\d+)$/);
+    return match ? parseInt(match[1]) : null;
+  });
+
+  function navigateTo(path) {
+    history.pushState(null, '', path);
+    currentPath = path;
+  }
 
   // Group sims by family name, filtered by sidebar search
   let groupedSims = $derived.by(() => {
@@ -32,7 +42,7 @@
     return sorted;
   });
 
-  let selectedSim = $derived(sims.find(s => s.id === selectedSimId) || null);
+  let selectedSim = $derived(sims.find(s => s.id === routeSimId) || null);
 
   let filteredRankings = $derived.by(() => {
     let result = showKnownOnly ? rankings.filter(r => r.relationship_daily !== null) : rankings;
@@ -69,28 +79,35 @@
     }
   }
 
-  async function selectSim(simId) {
-    if (selectedSimId === simId) return;
-    selectedSimId = simId;
+  // Fetch rankings whenever routeSimId changes
+  $effect(() => {
+    const simId = routeSimId;
+    if (!simId) {
+      rankings = [];
+      return;
+    }
     rankings = [];
     rankingsFilter = '';
-    mobileView = 'rankings';
     loadingRankings = true;
-    try {
-      const res = await fetch(`/api/sims/${simId}/compatibility`);
-      if (!res.ok) throw new Error(`Failed to fetch compatibility: ${res.status}`);
-      const data = await res.json();
-      rankings = data.rankings;
-    } catch (e) {
-      error = e.message;
-    } finally {
-      loadingRankings = false;
-    }
-  }
+    fetch(`/api/sims/${simId}/compatibility`)
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch compatibility: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (routeSimId === simId) rankings = data.rankings;
+      })
+      .catch(e => { error = e.message; })
+      .finally(() => {
+        if (routeSimId === simId) loadingRankings = false;
+      });
+  });
 
-  function goBack() {
-    mobileView = 'list';
-  }
+  $effect(() => {
+    const onPopState = () => currentPath = window.location.pathname;
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  });
 
   function formatInterest(key) {
     const labels = {
@@ -117,7 +134,7 @@
 <div class="layout">
   <div class="content">
     <!-- Left panel: Sim selector -->
-    <aside class="sidebar" class:mobile-hidden={mobileView === 'rankings'}>
+    <aside class="sidebar" class:mobile-hidden={routeSimId !== null}>
       <h2 class="panel-title">Sims</h2>
       <div class="filter-input-wrap">
         <input
@@ -144,8 +161,8 @@
               {#each members as sim}
                 <button
                   class="sim-button"
-                  class:selected={selectedSimId === sim.id}
-                  onclick={() => selectSim(sim.id)}
+                  class:selected={routeSimId === sim.id}
+                  onclick={() => navigateTo(`/sim/${sim.id}`)}
                 >
                   <img
                     class="sim-portrait-small"
@@ -164,13 +181,13 @@
     </aside>
 
     <!-- Right panel: Compatibility rankings -->
-    <main class="main-panel" class:mobile-hidden={mobileView === 'list'}>
+    <main class="main-panel" class:mobile-hidden={routeSimId === null}>
       {#if !selectedSim}
         <div class="empty-state">
           <p>Select a sim from the list to see compatibility rankings.</p>
         </div>
       {:else}
-        <button class="back-button" onclick={goBack}>&larr; All sims</button>
+        <button class="back-button" onclick={() => navigateTo('/')}>&larr; All sims</button>
         <div class="selected-sim-header">
           <img
             class="selected-sim-portrait"

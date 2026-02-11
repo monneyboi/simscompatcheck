@@ -1,6 +1,6 @@
 # Sims 1 Compatibility Checker
 
-A tool to help players of The Sims 1 (Complete Collection / Legacy) figure out which sims should talk to whom, based on shared interests and compatible personalities.
+A tool to help players of The Sims 1 (Complete Collection / Legacy) figure out which sims should talk to whom, based on shared interests.
 
 ## Architecture
 
@@ -194,26 +194,28 @@ Returns a ranked list of other sims sorted by compatibility with the selected si
       "score": 850,
       "common_interests": ["weather", "sports"],
       "risky_topics": ["violence"],
-      "personality_match": 720
+      "relationship_daily": 30,
+      "relationship_lifetime": 25,
+      "is_friend": false
     }
   ]
 }
 ```
 
-**Compatibility algorithm:**
+**Compatibility algorithm (100% interest-based):**
 
-1. **Interest compatibility (0-1000, weight: 70%)**:
-   - For each of the 8 interest categories, compare both sims' values
-   - A "common interest" = both sims have ≥ 700
-   - A "risky topic" = one sim has ≥ 700 and the other has ≤ 300
-   - Score = (number of common interests * 125) capped at 1000, minus (number of risky topics * 200) floored at 0
+Based on actual game mechanics decoded from BHAV behavior scripts in `GameData/`. In The Sims 1, conversation is entirely interest-based — personality only gates which interactions are available (e.g., Nice > 300 to Compliment, Playful ≥ 400 to Tickle), it does not affect relationship score deltas. Zodiac signs (PersonData[70]) are purely cosmetic and never read by any game script.
 
-2. **Personality compatibility (0-1000, weight: 30%)**:
-   - Compare the 5 personality traits
-   - Sims with moderate-to-high Outgoing (≥ 400), Playful (≥ 400), and Nice (≥ 400) are easier to befriend
-   - Score based on how many of these thresholds the OTHER sim meets (each worth 333)
+The game uses 15 interest topics: 8 base game (travel, violence, politics, sixties, weather, sports, music, outdoors from PersonData[46-53]) and 7 Hot Date (exercise, food, parties, style, hollywood, technology, romance from PersonData[13-14, 16, 20, 26, 54-55]).
 
-3. **Final score** = `interest_score * 0.7 + personality_score * 0.3`
+The game threshold is 400 on the 0-1000 scale (equivalent to 4 on the 0-10 scale): at or above is positive, below is negative.
+
+For each of the 15 topics, compare both sims' values:
+- **Common interest** (both ≥ 400): bonus = `min(val_a, val_b)` — stronger shared passion scores higher
+- **Risky topic** (one ≥ 400, other < 400): penalty = `abs(val_a - val_b)` — bigger gap means more friction
+- **Mutual disinterest** (both < 400): no effect — neither sim cares
+
+Raw sum is normalized from `[-15000, +15000]` to `[0, 1000]`.
 
 ### `GET /api/families`
 

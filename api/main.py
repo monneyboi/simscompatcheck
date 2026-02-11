@@ -226,7 +226,11 @@ async def get_portrait(sim_id: int):
     bmp = _portraits.get(sim_id)
     if bmp is None:
         raise HTTPException(status_code=404, detail="No portrait available")
-    return Response(content=bmp, media_type="image/bmp")
+    return Response(
+        content=bmp,
+        media_type="image/bmp",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/api/families")
