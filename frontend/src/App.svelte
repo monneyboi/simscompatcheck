@@ -6,6 +6,7 @@
   let loading = $state(true);
   let loadingRankings = $state(false);
   let error = $state(null);
+  let showKnownOnly = $state(false);
 
   // Group sims by family name
   let groupedSims = $derived.by(() => {
@@ -26,6 +27,10 @@
   });
 
   let selectedSim = $derived(sims.find(s => s.id === selectedSimId) || null);
+
+  let filteredRankings = $derived(
+    showKnownOnly ? rankings.filter(r => r.relationship_daily !== null) : rankings
+  );
 
   // Fetch sims and families on mount
   $effect(() => {
@@ -144,9 +149,15 @@
         {:else if rankings.length === 0}
           <p class="status-message">No compatibility data available.</p>
         {:else}
-          <h3 class="rankings-heading">Compatibility Rankings</h3>
+          <div class="rankings-toolbar">
+            <h3 class="rankings-heading">Compatibility Rankings</h3>
+            <label class="filter-toggle">
+              <input type="checkbox" bind:checked={showKnownOnly} />
+              Known sims only
+            </label>
+          </div>
           <div class="rankings-list">
-            {#each rankings as ranking, i}
+            {#each filteredRankings as ranking, i}
               <div class="ranking-card">
                 <div class="ranking-header">
                   <span class="ranking-rank">#{i + 1}</span>
@@ -180,9 +191,25 @@
                     </div>
                   {/if}
                   <div class="personality-row">
-                    <span class="interest-label">Personality match:</span>
+                    <span class="interest-label">Personality:</span>
                     <span class="data-value">{ranking.personality_match}</span>
                   </div>
+                  {#if ranking.relationship_daily !== null}
+                    <div class="relationship-row">
+                      <span class="interest-label">Relationship:</span>
+                      <span class="data-value" class:rel-positive={ranking.relationship_daily > 0} class:rel-negative={ranking.relationship_daily < 0}>
+                        {ranking.relationship_daily}
+                      </span>
+                      <span class="rel-detail">daily</span>
+                      <span class="data-value" class:rel-positive={ranking.relationship_lifetime > 0} class:rel-negative={ranking.relationship_lifetime < 0}>
+                        {ranking.relationship_lifetime}
+                      </span>
+                      <span class="rel-detail">lifetime</span>
+                      {#if ranking.is_friend}
+                        <span class="tag tag-green">Friend</span>
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
               </div>
             {/each}
@@ -358,13 +385,33 @@
     color: var(--color-muted);
   }
 
+  .rankings-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
   .rankings-heading {
     font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--color-muted);
-    margin-bottom: 12px;
+  }
+
+  .filter-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .filter-toggle input {
+    accent-color: var(--color-accent);
   }
 
   .rankings-list {
@@ -468,6 +515,26 @@
   .data-value {
     font-family: var(--font-mono);
     font-size: 0.8rem;
+  }
+
+  .rel-positive {
+    color: var(--color-green);
+  }
+
+  .rel-negative {
+    color: var(--color-red);
+  }
+
+  .rel-detail {
+    font-size: 0.7rem;
+    color: var(--color-muted);
+  }
+
+  .relationship-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   /* Responsive: stack on narrow screens */

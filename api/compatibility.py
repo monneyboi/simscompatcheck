@@ -30,6 +30,9 @@ class CompatibilityResult:
     common_interests: list[str]
     risky_topics: list[str]
     personality_match: int  # 0-1000
+    relationship_daily: int | None = None   # -100 to 100, None if never met
+    relationship_lifetime: int | None = None
+    is_friend: bool = False
 
 
 def _get_interest_value(interests: Interests, name: str) -> int:
@@ -103,12 +106,18 @@ def compute_compatibility(sim: Sim, other: Sim) -> CompatibilityResult:
 
     final = interest_score * 0.7 + personality_score * 0.3
 
+    # Look up existing relationship from sim -> other
+    rel = sim.relationships.get(other.id)
+
     return CompatibilityResult(
         sim=other,
         score=int(final),
         common_interests=common_interests,
         risky_topics=risky_topics,
         personality_match=personality_score,
+        relationship_daily=rel.daily if rel else None,
+        relationship_lifetime=rel.lifetime if rel else None,
+        is_friend=rel.is_friend if rel else False,
     )
 
 

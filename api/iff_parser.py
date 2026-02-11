@@ -38,6 +38,13 @@ class Interests:
 
 
 @dataclass
+class Relationship:
+    daily: int = 0       # -100 to 100
+    is_friend: bool = False
+    lifetime: int = 0    # -100 to 100
+
+
+@dataclass
 class Sim:
     id: int  # neighbour_id
     guid: int
@@ -47,6 +54,8 @@ class Sim:
     family_number: int
     personality: Personality = field(default_factory=Personality)
     interests: Interests = field(default_factory=Interests)
+    # neighbour_id -> Relationship
+    relationships: dict[int, Relationship] = field(default_factory=dict)
 
 
 @dataclass
@@ -200,16 +209,22 @@ def _parse_nbrs(data: bytes) -> list[Sim]:
         rel_count = struct.unpack_from("<i", data, pos)[0]
         pos += 4
 
-        # Relationships
+        # Relationships: neighbour_id -> [daily, is_friend, lifetime, ...]
+        relationships: dict[int, Relationship] = {}
         for _ in range(rel_count):
             key_count = struct.unpack_from("<i", data, pos)[0]
             pos += 4
-            # keys
+            rel_key = struct.unpack_from("<i", data, pos)[0]
             pos += 4 * key_count
             value_count = struct.unpack_from("<i", data, pos)[0]
             pos += 4
-            # values
+            vals = list(struct.unpack_from(f"<{value_count}i", data, pos))
             pos += 4 * value_count
+            relationships[rel_key] = Relationship(
+                daily=vals[0] if len(vals) > 0 else 0,
+                is_friend=bool(vals[1]) if len(vals) > 1 else False,
+                lifetime=vals[2] if len(vals) > 2 else 0,
+            )
 
         # Only keep sims that have PersonData
         if person_mode <= 0 or len(person_data_shorts) < 88:
@@ -261,6 +276,7 @@ def _parse_nbrs(data: bytes) -> list[Sim]:
             family_number=family_number,
             personality=personality,
             interests=interests,
+            relationships=relationships,
         )
         sims.append(sim)
 

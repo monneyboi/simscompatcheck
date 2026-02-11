@@ -175,6 +175,9 @@ async def get_compatibility(sim_id: int):
                 "common_interests": r.common_interests,
                 "risky_topics": r.risky_topics,
                 "personality_match": r.personality_match,
+                "relationship_daily": r.relationship_daily,
+                "relationship_lifetime": r.relationship_lifetime,
+                "is_friend": r.is_friend,
             }
             for r in rankings
         ],
