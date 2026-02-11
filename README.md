@@ -1,5 +1,7 @@
 # Sims 1 Compatibility Checker
 
+![Screenshot](screenshot.png)
+
 Figure out which sims should talk to whom, based on shared interests.
 
 Drop your `UserData/` folder from The Sims 1 (Complete Collection / Legacy) into the project root and start the servers.
@@ -25,12 +27,3 @@ The scoring is **100% interest-based**, matching actual game mechanics decoded f
 - **Interests** drive conversation outcomes. The game threshold is 400 (on 0-1000 scale): above means positive, below means negative. Two sims who both like a topic get a bonus; disagreement on a topic is penalized.
 - **Personality** only gates which interactions are available (e.g., mean sims can insult, playful sims can tickle). It does not affect relationship score changes.
 - **Zodiac signs** are purely cosmetic — displayed in Create-A-Sim but never read by any game script. The zodiac compatibility tables found online are from The Sims 2, not The Sims 1.
-
-## Features
-
-- Sim selector sidebar with portraits, grouped by family, with search
-- Compatibility rankings showing score, common interests, risky topics, and interaction tips
-- Existing relationship data (daily/lifetime scores, friend status) from the save file
-- "Known sims only" filter to show only sims with an existing relationship
-- URL-based routing (`/sim/{id}`) with browser history support
-- Mobile-responsive layout
