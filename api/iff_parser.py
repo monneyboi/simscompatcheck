@@ -136,12 +136,11 @@ def _parse_nbrs(data: bytes) -> list[Sim]:
     for _ in range(count):
         entry_start = pos
 
-        # unknown1 must be 1 for a valid entry
+        # unknown1 must be 1 for a valid entry; 0 means empty slot (skip 4 bytes)
         unknown1 = struct.unpack_from("<i", data, pos)[0]
         pos += 4
         if unknown1 != 1:
-            # Skip this entry -- we cannot know its size, so bail out.
-            break
+            continue
 
         # version per neighbour
         nbr_version = struct.unpack_from("<i", data, pos)[0]
