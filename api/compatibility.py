@@ -1,26 +1,38 @@
 """
 Compatibility scoring algorithm for The Sims 1 sims.
 
-Scores are based on shared interests (70% weight) and compatible
-personality traits (30% weight).
+Based on actual game mechanics decoded from BHAV behavior scripts and BCON
+tuning constants. Conversation is 100% interest-based — personality does not
+affect talk outcomes (it modulates specific interactions like Joke/Hug/Insult).
+
+Game interest brackets (BCON 4112, 0-10 scale):
+  value < 4  -> relationship delta -3
+  value >= 4 -> relationship delta +3
+
+On the 0-1000 normalized scale the threshold is 400.
+
+The game picks one random topic per conversation. Both sims react based on
+their interest level. For compatibility scoring, we measure per-topic
+AGREEMENT: do both sims feel the same way about this topic?
+
+Topics where both sims are interested (>= 400) are "common interests" —
+weighted by the weaker sim's value (stronger shared passion = better).
+Topics where they disagree are "risky" — penalized by the size of the gap.
+Topics where neither cares don't affect the score.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .iff_parser import Interests, Sim
+from .iff_parser import Interests, Sim, INTEREST_NAMES
 
-# The 8 interest category names, matching Interests field names
-INTEREST_CATEGORIES = [
-    "travel", "violence", "politics", "sixties",
-    "weather", "sports", "music", "outdoors",
-]
+# Threshold on the 0-1000 scale: below is negative, at or above is positive
+INTEREST_THRESHOLD = 400
 
-# Personality traits that affect compatibility
-# Sims with Outgoing >= 400, Playful >= 400, Nice >= 400 are easier to befriend
-FRIENDLY_TRAITS = ["outgoing", "playful", "nice"]
-FRIENDLY_THRESHOLD = 400
+# Normalization range: max bonus is 15 topics * 1000 (all common at max),
+# max penalty is 15 topics * 1000 (all risky with max gap).
+_MAX_RAW = len(INTEREST_NAMES) * 1000
 
 
 @dataclass
@@ -29,92 +41,69 @@ class CompatibilityResult:
     score: int  # 0-1000 final score
     common_interests: list[str]
     risky_topics: list[str]
-    personality_match: int  # 0-1000
     relationship_daily: int | None = None   # -100 to 100, None if never met
     relationship_lifetime: int | None = None
     is_friend: bool = False
 
 
-def _get_interest_value(interests: Interests, name: str) -> int:
-    """Get an interest value by category name."""
-    return getattr(interests, name)
-
-
 def compute_interest_score(
-    sim_a: Sim, sim_b: Sim
+    sim_a: Sim, sim_b: Sim,
 ) -> tuple[int, list[str], list[str]]:
     """
     Compute interest compatibility between two sims.
 
-    Returns (score, common_interests, risky_topics) where score is 0-1000.
+    For each of the 15 topics:
+    - Common interest (both >= 400): bonus = min(va, vb)
+      Higher shared values mean stronger agreement.
+    - Risky topic (one >= 400, other < 400): penalty = |va - vb|
+      Bigger gap means more friction.
+    - Mutual disinterest (both < 400): no effect.
+      Neither sim cares, so the topic is irrelevant.
 
-    - common_interest: both sims have >= 700 in a category
-    - risky_topic: one sim has >= 700 and the other has <= 300
-    - score = min(1000, common_count * 125) - min(score, risky_count * 200),
-      floored at 0
+    Returns (score, common_interests, risky_topics).
     """
     common_interests: list[str] = []
     risky_topics: list[str] = []
+    raw = 0
 
-    for category in INTEREST_CATEGORIES:
-        val_a = _get_interest_value(sim_a.interests, category)
-        val_b = _get_interest_value(sim_b.interests, category)
+    for name in INTEREST_NAMES:
+        val_a = getattr(sim_a.interests, name)
+        val_b = getattr(sim_b.interests, name)
 
-        # Check for common interest: both >= 700
-        if val_a >= 700 and val_b >= 700:
-            common_interests.append(category)
+        a_pos = val_a >= INTEREST_THRESHOLD
+        b_pos = val_b >= INTEREST_THRESHOLD
 
-        # Check for risky topic: one >= 700 and the other <= 300
-        if (val_a >= 700 and val_b <= 300) or (val_b >= 700 and val_a <= 300):
-            risky_topics.append(category)
+        if a_pos and b_pos:
+            common_interests.append(name)
+            raw += min(val_a, val_b)
+        elif a_pos != b_pos:
+            risky_topics.append(name)
+            raw -= abs(val_a - val_b)
+        # both below threshold: no contribution
 
-    score = min(1000, len(common_interests) * 125)
-    penalty = min(score, len(risky_topics) * 200)
-    score = max(0, score - penalty)
+    # Normalize from [-_MAX_RAW, +_MAX_RAW] to [0, 1000]
+    score = int((raw + _MAX_RAW) / (2 * _MAX_RAW) * 1000)
+    score = max(0, min(1000, score))
 
     return score, common_interests, risky_topics
-
-
-def compute_personality_score(other_sim: Sim) -> int:
-    """
-    Compute personality compatibility score for the OTHER sim.
-
-    Counts how many of Outgoing >= 400, Playful >= 400, Nice >= 400
-    the other sim meets. Each threshold met is worth 333 points.
-
-    Returns 0-999 (3 * 333 = 999, capped at 1000).
-    """
-    count = 0
-    for trait in FRIENDLY_TRAITS:
-        value = getattr(other_sim.personality, trait)
-        if value >= FRIENDLY_THRESHOLD:
-            count += 1
-
-    return min(1000, count * 333)
 
 
 def compute_compatibility(sim: Sim, other: Sim) -> CompatibilityResult:
     """
     Compute full compatibility between *sim* and *other*.
 
-    Final score = interest_score * 0.7 + personality_score * 0.3
+    Final score is 100% interest-based (matching actual game mechanics).
     """
-    interest_score, common_interests, risky_topics = compute_interest_score(
-        sim, other
-    )
-    personality_score = compute_personality_score(other)
-
-    final = interest_score * 0.7 + personality_score * 0.3
+    score, common_interests, risky_topics = compute_interest_score(sim, other)
 
     # Look up existing relationship from sim -> other
     rel = sim.relationships.get(other.id)
 
     return CompatibilityResult(
         sim=other,
-        score=int(final),
+        score=score,
         common_interests=common_interests,
         risky_topics=risky_topics,
-        personality_match=personality_score,
         relationship_daily=rel.daily if rel else None,
         relationship_lifetime=rel.lifetime if rel else None,
         is_friend=rel.is_friend if rel else False,

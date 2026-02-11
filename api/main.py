@@ -116,6 +116,24 @@ def _format_guid(guid: int) -> str:
     return f"0x{guid:08X}"
 
 
+ZODIAC_NAMES = [
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+]
+
+
+def _interaction_tips(sim: Sim) -> list[str]:
+    """Generate tips based on personality thresholds (>= 400)."""
+    tips = []
+    if sim.personality.playful >= 400:
+        tips.append("Jokes land well (high Playful)")
+    if sim.personality.outgoing >= 400:
+        tips.append("Receptive to hugs (high Outgoing)")
+    if sim.personality.nice >= 400:
+        tips.append("Hard to insult (high Nice)")
+    return tips
+
+
 def _sim_to_dict(sim: Sim) -> dict:
     family = _family_by_number.get(sim.family_number)
     return {
@@ -127,6 +145,7 @@ def _sim_to_dict(sim: Sim) -> dict:
         "house_number": family.house_number if family else 0,
         "age": sim.age,
         "gender": sim.gender,
+        "zodiac": ZODIAC_NAMES[sim.zodiac] if 0 <= sim.zodiac < 12 else "Unknown",
         "personality": {
             "nice": sim.personality.nice,
             "active": sim.personality.active,
@@ -135,6 +154,11 @@ def _sim_to_dict(sim: Sim) -> dict:
             "neat": sim.personality.neat,
         },
         "interests": {
+            "exercise": sim.interests.exercise,
+            "food": sim.interests.food,
+            "parties": sim.interests.parties,
+            "style": sim.interests.style,
+            "hollywood": sim.interests.hollywood,
             "travel": sim.interests.travel,
             "violence": sim.interests.violence,
             "politics": sim.interests.politics,
@@ -143,7 +167,10 @@ def _sim_to_dict(sim: Sim) -> dict:
             "sports": sim.interests.sports,
             "music": sim.interests.music,
             "outdoors": sim.interests.outdoors,
+            "technology": sim.interests.technology,
+            "romance": sim.interests.romance,
         },
+        "interaction_tips": _interaction_tips(sim),
     }
 
 
@@ -184,7 +211,6 @@ async def get_compatibility(sim_id: int):
                 "score": r.score,
                 "common_interests": r.common_interests,
                 "risky_topics": r.risky_topics,
-                "personality_match": r.personality_match,
                 "relationship_daily": r.relationship_daily,
                 "relationship_lifetime": r.relationship_lifetime,
                 "is_friend": r.is_friend,

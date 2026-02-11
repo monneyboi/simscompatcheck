@@ -27,14 +27,24 @@ class Personality:
 
 @dataclass
 class Interests:
-    travel: int = 0    # adults: Travel, children: Toys
-    violence: int = 0  # adults: Violence, children: Aliens
-    politics: int = 0  # adults: Politics, children: Pets
-    sixties: int = 0   # adults: 60s/70s, children: School
-    weather: int = 0
-    sports: int = 0
-    music: int = 0
-    outdoors: int = 0
+    # Hot Date expansion interests
+    exercise: int = 0    # PD[13]
+    food: int = 0        # PD[14]
+    parties: int = 0     # PD[16]
+    style: int = 0       # PD[20]
+    hollywood: int = 0   # PD[26]
+    # Base game interests
+    travel: int = 0      # PD[46] adults: Travel, children: Toys
+    violence: int = 0    # PD[47] adults: Crime, children: Aliens
+    politics: int = 0    # PD[48] adults: Politics, children: Pets
+    sixties: int = 0     # PD[49] adults: 60s/70s, children: School
+    weather: int = 0     # PD[50]
+    sports: int = 0      # PD[51]
+    music: int = 0       # PD[52]
+    outdoors: int = 0    # PD[53]
+    # Hot Date expansion interests (continued)
+    technology: int = 0  # PD[54]
+    romance: int = 0     # PD[55]
 
 
 @dataclass
@@ -54,6 +64,7 @@ class Sim:
     family_number: int
     personality: Personality = field(default_factory=Personality)
     interests: Interests = field(default_factory=Interests)
+    zodiac: int = 0  # PD[70], 0-11, display only
     # neighbour_id -> Relationship
     relationships: dict[int, Relationship] = field(default_factory=dict)
 
@@ -122,11 +133,23 @@ def _read_null_terminated_string(data: bytes, offset: int) -> tuple[str, int]:
 # NBRS chunk parser
 # ---------------------------------------------------------------------------
 
-INTEREST_INDICES = [46, 47, 48, 49, 50, 51, 52, 53]
-INTEREST_NAMES = [
+# Hot Date interests (PD indices scattered across the array)
+HOTDATE_INTEREST_INDICES = [13, 14, 16, 20, 26, 54, 55]
+HOTDATE_INTEREST_NAMES = [
+    "exercise", "food", "parties", "style", "hollywood",
+    "technology", "romance",
+]
+
+# Base game interests (PD indices 46-53, contiguous)
+BASE_INTEREST_INDICES = [46, 47, 48, 49, 50, 51, 52, 53]
+BASE_INTEREST_NAMES = [
     "travel", "violence", "politics", "sixties",
     "weather", "sports", "music", "outdoors",
 ]
+
+# All 15 combined (used for compatibility scoring)
+INTEREST_INDICES = HOTDATE_INTEREST_INDICES + BASE_INTEREST_INDICES
+INTEREST_NAMES = HOTDATE_INTEREST_NAMES + BASE_INTEREST_NAMES
 
 
 def _parse_nbrs(data: bytes) -> list[Sim]:
@@ -240,23 +263,42 @@ def _parse_nbrs(data: bytes) -> list[Sim]:
         )
 
         # -- Extract interests -------------------------------------------------
-        raw_interests = [person_data_shorts[i] for i in INTEREST_INDICES]
+        # Normalize base and Hot Date groups separately — some user-created sims
+        # have Hot Date interests already 0-1000 while base interests are 0-10
+        raw_base = [person_data_shorts[i] for i in BASE_INTEREST_INDICES]
+        raw_hotdate = [person_data_shorts[i] for i in HOTDATE_INTEREST_INDICES]
 
-        # Normalize: if max interest value <= 10, multiply all by 100
-        max_interest = max(raw_interests) if raw_interests else 0
-        if max_interest <= 10:
-            raw_interests = [v * 100 for v in raw_interests]
+        max_base = max(raw_base) if raw_base else 0
+        if max_base <= 10:
+            raw_base = [v * 100 for v in raw_base]
+
+        max_hotdate = max(raw_hotdate) if raw_hotdate else 0
+        if max_hotdate <= 10:
+            raw_hotdate = [v * 100 for v in raw_hotdate]
 
         interests = Interests(
-            travel=raw_interests[0],
-            violence=raw_interests[1],
-            politics=raw_interests[2],
-            sixties=raw_interests[3],
-            weather=raw_interests[4],
-            sports=raw_interests[5],
-            music=raw_interests[6],
-            outdoors=raw_interests[7],
+            # Hot Date (first 5)
+            exercise=raw_hotdate[0],
+            food=raw_hotdate[1],
+            parties=raw_hotdate[2],
+            style=raw_hotdate[3],
+            hollywood=raw_hotdate[4],
+            # Base game
+            travel=raw_base[0],
+            violence=raw_base[1],
+            politics=raw_base[2],
+            sixties=raw_base[3],
+            weather=raw_base[4],
+            sports=raw_base[5],
+            music=raw_base[6],
+            outdoors=raw_base[7],
+            # Hot Date (last 2)
+            technology=raw_hotdate[5],
+            romance=raw_hotdate[6],
         )
+
+        # -- Zodiac (display only) ---------------------------------------------
+        zodiac = person_data_shorts[70] if len(person_data_shorts) > 70 else 0
 
         # -- Age & gender ------------------------------------------------------
         persons_age = person_data_shorts[58]
@@ -276,6 +318,7 @@ def _parse_nbrs(data: bytes) -> list[Sim]:
             family_number=family_number,
             personality=personality,
             interests=interests,
+            zodiac=zodiac,
             relationships=relationships,
         )
         sims.append(sim)

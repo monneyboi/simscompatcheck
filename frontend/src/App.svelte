@@ -77,14 +77,21 @@
 
   function formatInterest(key) {
     const labels = {
+      exercise: 'Exercise',
+      food: 'Food',
+      parties: 'Parties',
+      style: 'Style',
+      hollywood: 'Hollywood',
       travel: 'Travel',
-      violence: 'Violence',
+      violence: 'Crime',
       politics: 'Politics',
       sixties: '60s/70s',
       weather: 'Weather',
       sports: 'Sports',
       music: 'Music',
       outdoors: 'Outdoors',
+      technology: 'Technology',
+      romance: 'Romance',
     };
     return labels[key] || key;
   }
@@ -154,6 +161,9 @@
             <div class="selected-sim-details">
               <span class="detail-chip">{selectedSim.age}</span>
               <span class="detail-chip">{selectedSim.gender}</span>
+              {#if selectedSim.zodiac}
+                <span class="detail-chip">{selectedSim.zodiac}</span>
+              {/if}
             </div>
           </div>
         </div>
@@ -210,10 +220,14 @@
                       {/each}
                     </div>
                   {/if}
-                  <div class="personality-row">
-                    <span class="interest-label">Personality:</span>
-                    <span class="data-value">{ranking.personality_match}</span>
-                  </div>
+                  {#if ranking.sim.interaction_tips && ranking.sim.interaction_tips.length > 0}
+                    <div class="interest-row">
+                      <span class="interest-label">Tips:</span>
+                      {#each ranking.sim.interaction_tips as tip}
+                        <span class="tag tag-blue">{tip}</span>
+                      {/each}
+                    </div>
+                  {/if}
                   {#if ranking.relationship_daily !== null}
                     <div class="relationship-row">
                       <span class="interest-label">Relationship:</span>
@@ -539,7 +553,7 @@
     gap: 4px;
   }
 
-  .interest-row, .personality-row {
+  .interest-row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -572,6 +586,12 @@
     background: #fef2f2;
     color: var(--color-red);
     border: 1px solid #fecaca;
+  }
+
+  .tag-blue {
+    background: #eff6ff;
+    color: var(--color-accent);
+    border: 1px solid #bfdbfe;
   }
 
   .data-value {
