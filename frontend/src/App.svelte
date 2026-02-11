@@ -7,18 +7,23 @@
   let loadingRankings = $state(false);
   let error = $state(null);
   let showKnownOnly = $state(false);
+  let sidebarFilter = $state('');
+  let rankingsFilter = $state('');
 
-  // Group sims by family name
+  // Group sims by family name, filtered by sidebar search
   let groupedSims = $derived.by(() => {
+    const q = sidebarFilter.toLowerCase().trim();
+    const filtered = q
+      ? sims.filter(s => s.name.toLowerCase().includes(q) || (s.family_name || '').toLowerCase().includes(q))
+      : sims;
     const groups = {};
-    for (const sim of sims) {
+    for (const sim of filtered) {
       const familyName = sim.family_name || 'Unknown';
       if (!groups[familyName]) {
         groups[familyName] = [];
       }
       groups[familyName].push(sim);
     }
-    // Sort families alphabetically, sort sims within each family by name
     const sorted = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
     for (const [, members] of sorted) {
       members.sort((a, b) => a.name.localeCompare(b.name));
@@ -28,9 +33,14 @@
 
   let selectedSim = $derived(sims.find(s => s.id === selectedSimId) || null);
 
-  let filteredRankings = $derived(
-    showKnownOnly ? rankings.filter(r => r.relationship_daily !== null) : rankings
-  );
+  let filteredRankings = $derived.by(() => {
+    let result = showKnownOnly ? rankings.filter(r => r.relationship_daily !== null) : rankings;
+    const q = rankingsFilter.toLowerCase().trim();
+    if (q) {
+      result = result.filter(r => r.sim.name.toLowerCase().includes(q) || (r.sim.family_name || '').toLowerCase().includes(q));
+    }
+    return result;
+  });
 
   // Fetch sims and families on mount
   $effect(() => {
@@ -62,6 +72,7 @@
     if (selectedSimId === simId) return;
     selectedSimId = simId;
     rankings = [];
+    rankingsFilter = '';
     loadingRankings = true;
     try {
       const res = await fetch(`/api/sims/${simId}/compatibility`);
@@ -106,6 +117,17 @@
     <!-- Left panel: Sim selector -->
     <aside class="sidebar">
       <h2 class="panel-title">Sims</h2>
+      <div class="filter-input-wrap">
+        <input
+          class="filter-input"
+          type="text"
+          placeholder="Filter sims..."
+          bind:value={sidebarFilter}
+        />
+        {#if sidebarFilter}
+          <button class="filter-clear" onclick={() => sidebarFilter = ''}>×</button>
+        {/if}
+      </div>
       {#if loading}
         <p class="status-message">Loading sims...</p>
       {:else if error && sims.length === 0}
@@ -175,10 +197,23 @@
         {:else}
           <div class="rankings-toolbar">
             <h3 class="rankings-heading">Compatibility Rankings</h3>
-            <label class="filter-toggle">
-              <input type="checkbox" bind:checked={showKnownOnly} />
-              Known sims only
-            </label>
+            <div class="rankings-toolbar-right">
+              <div class="filter-input-wrap filter-input-wrap--inline">
+                <input
+                  class="filter-input"
+                  type="text"
+                  placeholder="Filter results..."
+                  bind:value={rankingsFilter}
+                />
+                {#if rankingsFilter}
+                  <button class="filter-clear" onclick={() => rankingsFilter = ''}>×</button>
+                {/if}
+              </div>
+              <label class="filter-toggle">
+                <input type="checkbox" bind:checked={showKnownOnly} />
+                Known sims only
+              </label>
+            </div>
           </div>
           <div class="rankings-list">
             {#each filteredRankings as ranking, i}
@@ -297,6 +332,55 @@
     color: var(--color-muted);
     padding: 12px 16px 8px;
     flex-shrink: 0;
+  }
+
+  .filter-input-wrap {
+    position: relative;
+    padding: 0 12px 8px;
+    flex-shrink: 0;
+  }
+
+  .filter-input-wrap--inline {
+    padding: 0;
+  }
+
+  .filter-input {
+    width: 100%;
+    padding: 5px 24px 5px 8px;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--color-text);
+    outline: none;
+    box-sizing: border-box;
+  }
+
+  .filter-input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .filter-input::placeholder {
+    color: var(--color-muted);
+  }
+
+  .filter-clear {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-muted);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 2px;
+  }
+
+  .filter-input-wrap--inline .filter-clear {
+    right: 4px;
   }
 
   .sim-list {
@@ -461,6 +545,12 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--color-muted);
+  }
+
+  .rankings-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   .filter-toggle {
